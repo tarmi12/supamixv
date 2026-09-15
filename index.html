@@ -14,7 +14,7 @@
     <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200 gap-4">
       <div>
         <h1 class="text-xl font-bold text-gray-900">Tiger Pay Voucher Hub</h1>
-        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด ออกสลิป 80x80 พร้อม QR Code 12 หลัก</p>
+        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด ออกสลิป 80x80 พร้อม QR Code</p>
       </div>
       <div class="flex items-center gap-2 w-full md:w-auto">
         <label class="text-sm font-semibold whitespace-nowrap">พนักงานประจำจุด:</label>
@@ -36,9 +36,15 @@
         <p class="text-xs text-gray-500">ยกเลิกคูปองเดิม และสร้างยอดใหม่ 1 ใบพร้อมพิมพ์สลิป 2 ส่วน</p>
       </div>
       
+      <!-- ช่องกรอกเลขที่บิลด้วยมือ -->
+      <div class="space-y-1">
+        <label class="text-sm font-medium text-gray-700">เลขที่บิล / เลขเอกสารอ้างอิง (กรอกด้วยมือ):</label>
+        <input id="combine-bill-no" type="text" placeholder="เช่น B-690915-01 หรือ เลขที่บิลชั่ง" class="w-full border p-2.5 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/40 border-blue-200" />
+      </div>
+
       <div class="space-y-2">
-        <label class="text-sm font-medium">รหัสคูปองเดิม (สแกนหรือพิมพ์ใบละบรรทัด):</label>
-        <textarea id="combine-input" rows="5" placeholder="เช่น:&#10;275498124012&#10;275498124013" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+        <label class="text-sm font-medium text-gray-700">รหัสคูปองเดิม (สแกนหรือพิมพ์ใบละบรรทัด):</label>
+        <textarea id="combine-input" rows="4" placeholder="เช่น:&#10;275498124012&#10;275498124013" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
       </div>
 
       <button id="btn-combine" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow transition text-base">
@@ -80,6 +86,7 @@
               <th class="p-3">วันที่-เวลา</th>
               <th class="p-3">ประเภท</th>
               <th class="p-3">พนักงาน</th>
+              <th class="p-3">เลขที่บิล</th>
               <th class="p-3 text-right">ยอดรวม</th>
               <th class="p-3">คูปองใหม่ (12 หลัก)</th>
               <th class="p-3 text-center">พิมพ์ซ้ำ</th>
@@ -87,7 +94,7 @@
             </tr>
           </thead>
           <tbody id="history-tbody" class="divide-y divide-gray-100 font-mono">
-            <tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>
+            <tr><td colspan="8" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>
           </tbody>
         </table>
       </div>
@@ -140,15 +147,11 @@
       if (tab === 'report') fetchHistory();
     }
 
-    // ==========================================
-    // ระบบพิมพ์ผ่าน Isolated Iframe (แก้ปัญหากระดาษขาวถาวร)
-    // ==========================================
+    // ฟังก์ชันพิมพ์ผ่าน Iframe
     function printViaIframe(contentHtml) {
-      // ลบ iframe เก่าหากมีค้างอยู่
       const oldIframe = document.getElementById('receipt-print-frame');
       if (oldIframe) oldIframe.remove();
 
-      // สร้าง iframe แยกขึ้นมาใน background
       const iframe = document.createElement('iframe');
       iframe.id = 'receipt-print-frame';
       iframe.style.position = 'fixed';
@@ -194,7 +197,6 @@
       `);
       doc.close();
 
-      // รอรูปภาพใน iframe โหลดเสร็จทั้งหมด แล้วสั่งพิมพ์ทันที
       const img = doc.querySelector('img');
       const trigger = () => {
         setTimeout(() => {
@@ -218,7 +220,9 @@
     // 1. รวมยอดคูปอง
     async function handleCombine() {
       const staff = document.getElementById('staff_name').value.trim();
+      const billNo = document.getElementById('combine-bill-no').value.trim() || '-';
       const rawText = document.getElementById('combine-input').value.trim();
+      
       if (!staff) return alert("⚠️ กรุณาระบุชื่อพนักงานที่ช่องด้านบนก่อนเริ่มทำรายการ");
       if (!rawText) return alert("⚠️ กรุณากรอกรหัสคูปองอย่างน้อย 1 ใบ");
 
@@ -231,18 +235,33 @@
         const res = await fetch(EDGE_FUNCTION_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: "COMBINE", staff_name: staff, vouchers })
+          body: JSON.stringify({ 
+            action: "COMBINE", 
+            staff_name: staff, 
+            vouchers: vouchers,
+            bill_no: billNo 
+          })
         });
         const data = await res.json();
         if (data.status === "ERROR" || data.error) throw new Error(data.message || data.error);
 
+        // อัปเดต bill_no ลงในฐานข้อมูล Supabase เพื่อให้ Reprint แล้วยังมีเลขบิล
+        if (supabaseClient && data.transaction_id) {
+          await supabaseClient
+            .from('voucher_transactions')
+            .update({ ref_num: billNo })
+            .eq('transaction_id', data.transaction_id);
+        }
+
         document.getElementById('combine-input').value = "";
+        document.getElementById('combine-bill-no').value = "";
         
         buildCombineSlip({
           transaction_id: data.transaction_id,
           created_at: new Date().toISOString(),
           staff_name: staff,
           action_type: "COMBINE",
+          bill_no: billNo,
           old_vouchers: data.validated_vouchers,
           total_amount: data.total_amount,
           new_voucher_code: data.new_voucher,
@@ -300,10 +319,10 @@
     // 3. ดึงประวัติ
     async function fetchHistory() {
       const tbody = document.getElementById('history-tbody');
-      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังดึงข้อมูล...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">กำลังดึงข้อมูล...</td></tr>`;
 
       if (!supabaseClient) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500 font-bold">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500 font-bold">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</td></tr>`;
         return;
       }
 
@@ -314,12 +333,12 @@
         .limit(40);
 
       if (error) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500 font-bold">โหลดข้อมูลล้มเหลว: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500 font-bold">โหลดข้อมูลล้มเหลว: ${error.message}</td></tr>`;
         return;
       }
 
       if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีรายการบันทึกในระบบ</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">ยังไม่มีรายการบันทึกในระบบ</td></tr>`;
         return;
       }
 
@@ -329,6 +348,7 @@
           <td class="p-3">${new Date(row.created_at).toLocaleString('th-TH')}</td>
           <td class="p-3 font-bold ${row.action_type === 'COMBINE' ? 'text-blue-600' : 'text-red-600'}">${row.action_type}</td>
           <td class="p-3">${row.staff_name}</td>
+          <td class="p-3 font-bold text-gray-700">${row.ref_num && row.ref_num !== 'ERROR' ? row.ref_num : '-'}</td>
           <td class="p-3 font-bold text-right">${Number(row.total_amount).toLocaleString()} ฿</td>
           <td class="p-3 text-green-700 font-bold tracking-wider">${row.new_voucher_code || '-'}</td>
           <td class="p-3 text-center">
@@ -343,7 +363,7 @@
       `).join('');
     }
 
-    // จัดการ Reprint
+    // สั่ง Reprint
     async function triggerReprint(index) {
       const row = cachedRows[index];
       if (!row) return;
@@ -366,6 +386,7 @@
       if (row.action_type === 'COMBINE') {
         buildCombineSlip({
           ...row,
+          bill_no: row.ref_num && row.ref_num !== 'ERROR' ? row.ref_num : '-',
           is_reprint: true,
           reprint_time: now.toLocaleString('th-TH'),
           reprinted_by: currentStaff
@@ -383,15 +404,17 @@
       fetchHistory();
     }
 
-    // สร้างสลิปรวมบิล (2 ส่วน + QR Code 12 หลัก)
+    // ฟังก์ชันสร้างสลิปรวมบิล (เพิ่มแจกแจงยอดบิลลูกค้า + QR ขนาดกะทัดรัด 90px)
     function buildCombineSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
       const oldList = item.old_vouchers || [];
       const billCount = oldList.length;
       const newCode = (item.new_voucher_code || '').trim();
+      const billNo = item.bill_no || '-';
 
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(newCode)}`;
+      // ย่อขนาด QR Code เป็น 90x90 เพื่อให้พอดีกับหัวอ่าน ไม่ใหญ่เกะกะ
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=95x95&margin=0&data=${encodeURIComponent(newCode)}`;
 
       let reprintHeader = '';
       if (item.is_reprint) {
@@ -403,53 +426,70 @@
       }
 
       const html = `
-        <!-- ส่วนที่ 1: ให้ลูกค้า -->
+        <!-- ส่วนที่ 1: ให้ลูกค้า (แสดงรายการยอดเงินที่รวม และเลขที่บิล) -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">ใบรับเงินรวมคูปอง</div>
         <div style="text-align: center; font-size: 10px; margin-bottom: 4px;">(เอกสารสำหรับลูกค้า)</div>
         ${reprintHeader}
         <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
         <div>พนักงาน: ${item.staff_name}</div>
+        <div>เลขที่บิล: <strong>${billNo}</strong></div>
         <div>TX: ${item.transaction_id}</div>
-        <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
-        <div style="font-size: 13px; font-weight: bold;">จำนวนบิลที่รวม: ${billCount} ใบ</div>
-        <div style="font-size: 15px; font-weight: bold; margin-top: 2px;">ยอดรวมสุทธิ: ${Number(item.total_amount).toLocaleString()} บาท</div>
-        <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        
+        <div style="font-size: 12px; font-weight: bold; margin-bottom: 2px;">รายการยอดเงินที่รวม (${billCount} ใบ):</div>
+        <div style="padding-left: 4px; margin-bottom: 4px;">
+          ${oldList.map((v, i) => `
+            <div style="display: flex; justify-content: space-between;">
+              <span>ใบที่ ${i+1}:</span>
+              <span><strong>${Number(v.amount).toFixed(2)} บาท</strong></span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 2px;">
+          <span>ยอดรวมสุทธิ:</span>
+          <span>${Number(item.total_amount).toFixed(2)} บาท</span>
+        </div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
         <div style="text-align: center; font-size: 10px;">โปรดเก็บเอกสารนี้ไว้เป็นหลักฐาน</div>
 
-        <!-- รอยตัดกระดาษ -->
-        <div style="border-top: 2px dashed #000; text-align: center; margin: 18px 0 14px 0; font-weight: bold; font-size: 11px;">
+        <!-- รอยตัดหน้ากระดาษ -->
+        <div style="border-top: 2px dashed #000; text-align: center; margin: 16px 0 12px 0; font-weight: bold; font-size: 11px;">
           ✂️ - - - - - - ตัดหน้ากระดาษ - - - - - -
         </div>
 
-        <!-- ส่วนที่ 2: ร้านเก็บไว้ (พร้อม QR Code) -->
+        <!-- ส่วนที่ 2: ร้านเก็บไว้ (พร้อม QR Code ขนาดกะทัดรัด) -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการรวมคูปอง</div>
         <div style="text-align: center; font-size: 10px; margin-bottom: 4px;">(ร้านเก็บไว้ / สแกนที่ตู้จ่ายเงิน)</div>
         ${reprintHeader}
         <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
-        <div>พนักงาน: ${item.staff_name} | TX: ${item.transaction_id}</div>
-        <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
-        <div style="font-weight: bold;">รายการคูปองเดิมที่ยกเลิก (${billCount} ใบ):</div>
-        <div style="padding-left: 4px; margin: 4px 0;">
-          ${oldList.map((v, i) => `<div>${i+1}. ${v.code} : ${Number(v.amount).toLocaleString()} ฿</div>`).join('')}
+        <div>พนักงาน: ${item.staff_name} | บิล: <strong>${billNo}</strong></div>
+        <div>TX: ${item.transaction_id}</div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-weight: bold;">รายการคูปองเดิมที่ยกเลิก:</div>
+        <div style="padding-left: 4px; margin: 3px 0;">
+          ${oldList.map((v, i) => `<div>${i+1}. ${v.code} : ${Number(v.amount).toFixed(2)} ฿</div>`).join('')}
         </div>
-        <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
-        <div style="font-size: 13px; font-weight: bold;">ยอดเงินรวมที่สร้างใหม่: ${Number(item.total_amount).toLocaleString()} บาท</div>
-        <div style="font-size: 12px; font-weight: bold; margin-top: 4px;">เลขที่เวาเชอร์ใหม่ (12 หลัก):</div>
-        <div style="text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin: 4px 0;">
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-size: 13px; font-weight: bold;">ยอดเงินสร้างใหม่: ${Number(item.total_amount).toFixed(2)} บาท</div>
+        <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">เลขที่เวาเชอร์ใหม่ (12 หลัก):</div>
+        <div style="text-align: center; font-size: 17px; font-weight: bold; letter-spacing: 2px; margin: 2px 0;">
           ${newCode}
         </div>
         
-        <div style="text-align: center; margin: 8px 0;">
-          <img src="${qrImageUrl}" style="width: 140px; height: 140px; margin: 0 auto; display: block;" alt="QR Code" />
+        <!-- รูป QR Code กะทัดรัด (95x95px) -->
+        <div style="text-align: center; margin: 6px 0;">
+          <img src="${qrImageUrl}" style="width: 95px; height: 95px; margin: 0 auto; display: block;" alt="QR Code" />
         </div>
         <div style="text-align: center; font-size: 10px;">สแกน QR Code นี้ที่ช่องอ่านตู้จ่ายเงิน</div>
-        <div style="height: 25px;"></div>
+        <div style="height: 18px;"></div>
       `;
 
       printViaIframe(html);
     }
 
-    // สร้างสลิปยกเลิกเดี่ยว
+    // ฟังก์ชันพิมพ์สลิปยกเลิกเดี่ยว
     function buildCancelSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
@@ -464,20 +504,22 @@
       }
 
       const html = `
-        <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการยกเลิกคูปอง</div>
-        <div style="text-align: center; font-size: 10px; margin-bottom: 6px;">(TIGER PAY CASHBOX)</div>
-        ${reprintHeader}
-        <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
-        <div>พนักงาน: ${item.staff_name}</div>
-        <div>TX: ${item.transaction_id}</div>
-        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
-        <div style="font-size: 13px; font-weight: bold;">สถานะ: ยกเลิกคูปองสำเร็จ (VOID)</div>
-        <div style="font-size: 16px; font-weight: bold; margin: 6px 0; letter-spacing: 1px; text-align: center;">
-          ${item.voucher_code}
+        <div style="font-size: 11px; line-height: 1.35; padding: 4px;">
+          <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการยกเลิกคูปอง</div>
+          <div style="text-align: center; font-size: 10px; margin-bottom: 6px;">(TIGER PAY CASHBOX)</div>
+          ${reprintHeader}
+          <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
+          <div>พนักงาน: ${item.staff_name}</div>
+          <div>TX: ${item.transaction_id}</div>
+          <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+          <div style="font-size: 13px; font-weight: bold;">สถานะ: ยกเลิกคูปองสำเร็จ (VOID)</div>
+          <div style="font-size: 16px; font-weight: bold; margin: 6px 0; letter-spacing: 1px; text-align: center;">
+            ${item.voucher_code}
+          </div>
+          <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+          <div style="text-align: center; font-size: 10px;">คูปองนี้ถูกระงับสิทธิ์ในระบบเรียบร้อยแล้ว</div>
+          <div style="height: 18px;"></div>
         </div>
-        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
-        <div style="text-align: center; font-size: 10px;">คูปองนี้ถูกระงับสิทธิ์ในระบบเรียบร้อยแล้ว</div>
-        <div style="height: 25px;"></div>
       `;
 
       printViaIframe(html);
