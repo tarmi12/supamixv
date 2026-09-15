@@ -5,24 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ระบบจัดการคูปอง Tiger Pay</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- โหลด Supabase JS SDK ตัวเสถียร -->
   <script src="https://unpkg.com/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+  <!-- ไลบรารีสร้าง QR Code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     @media print {
       body * { visibility: hidden; }
-      #slip-print, #slip-print * { visibility: visible; }
-      #slip-print { position: absolute; left: 0; top: 0; width: 80mm; }
+      #slip-print-area, #slip-print-area * { visibility: visible; }
+      #slip-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 78mm;
+        margin: 0;
+        padding: 4px;
+        color: #000 !important;
+        font-family: monospace;
+      }
+      .page-break {
+        page-break-after: always;
+      }
     }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
   <div class="max-w-4xl mx-auto p-4 md:p-6">
-    <!-- แถบด้านบน: ระบุชื่อพนักงานที่กำลังใช้งาน -->
     <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200 gap-4">
       <div>
         <h1 class="text-xl font-bold text-gray-900">Tiger Pay Voucher Hub</h1>
-        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด และตรวจสอบรายการย้อนหลัง</p>
+        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด และพิมพ์สลิป 80x80 พร้อม QR Code</p>
       </div>
       <div class="flex items-center gap-2 w-full md:w-auto">
         <label class="text-sm font-semibold whitespace-nowrap">พนักงานประจำจุด:</label>
@@ -30,17 +42,17 @@
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
+    <!-- แถบเมนู 3 หน้า -->
     <div class="flex bg-gray-200 p-1 rounded-xl mb-6 font-semibold text-sm">
       <button id="tab-combine" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-blue-600 transition font-bold">1. รวมยอดคูปอง</button>
       <button id="tab-cancel" class="flex-1 py-2 rounded-lg text-gray-600 transition">2. ยกเลิกคูปองเดี่ยว</button>
       <button id="tab-report" class="flex-1 py-2 rounded-lg text-gray-600 transition">3. ประวัติ & Reprint</button>
     </div>
 
-    <!-- ================= หน้า 1: รวมยอดคูปอง ================= -->
+    <!-- หน้า 1: รวมยอดคูปอง -->
     <div id="page-combine" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
       <h2 class="text-lg font-bold text-gray-800">รวมคูปองหลายใบ เป็นยอดเดียว</h2>
-      <p class="text-xs text-gray-500">ระบบจะทำการยกเลิกคูปองเดิมทั้งหมด และสร้างคูปองใบใหม่ 1 ใบตามยอดรวมอัตโนมัติ</p>
+      <p class="text-xs text-gray-500">ระบบจะยกเลิกคูปองเดิมทั้งหมด ออกยอดใหม่ 1 ใบ พร้อมพิมพ์สลิปแบ่ง 2 ส่วน</p>
       
       <div class="space-y-2">
         <label class="text-sm font-medium">รหัสคูปองเดิม (สแกนหรือพิมพ์ใบละบรรทัด):</label>
@@ -48,14 +60,14 @@
       </div>
 
       <button id="btn-combine" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition">
-        ยืนยันการรวมยอดคูปอง
+        ยืนยันการรวมยอดและพิมพ์สลิป
       </button>
     </div>
 
-    <!-- ================= หน้า 2: ยกเลิกคูปองเดี่ยว ================= -->
+    <!-- หน้า 2: ยกเลิกคูปองเดี่ยว -->
     <div id="page-cancel" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-      <h2 class="text-lg font-bold text-red-600">ยกเลิกคูปอง (ไม่มีการออกใบใหม่)</h2>
-      <p class="text-xs text-gray-500">สำหรับคูปองที่สลักยอดผิด หรือลูกค้าขอยกเลิกรายการ</p>
+      <h2 class="text-lg font-bold text-red-600">ยกเลิกคูปองเดี่ยว</h2>
+      <p class="text-xs text-gray-500">สำหรับคูปองที่ออกผิดพลาด เมื่อยกเลิกสำเร็จจะพิมพ์เอกสารยืนยันให้ทันที</p>
 
       <div class="space-y-2">
         <label class="text-sm font-medium">รหัสคูปองที่ต้องการยกเลิก:</label>
@@ -67,7 +79,7 @@
       </button>
     </div>
 
-    <!-- ================= หน้า 3: ประวัติและพิมพ์ซ้ำ (Reprint) ================= -->
+    <!-- หน้า 3: ประวัติและพิมพ์ซ้ำ -->
     <div id="page-report" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <h2 class="text-lg font-bold text-gray-800">ประวัติการทำรายการ & Reprint</h2>
@@ -95,90 +107,50 @@
     </div>
   </div>
 
-  <!-- แทมเพลตสำหรับพิมพ์สลิปความร้อน (80mm) -->
-  <div id="slip-print" class="hidden font-mono p-4 text-xs leading-relaxed">
-    <div class="text-center font-bold text-base mb-2">TIGER PAY SLIP</div>
-    <div id="print-watermark" class="text-center font-bold text-red-600 border border-red-600 p-1 mb-2 hidden">
-      *** REPRINT SLIP ***<br>
-      <span id="print-reprint-time" class="text-[10px]"></span>
-    </div>
-    <hr class="border-dashed my-2"/>
-    <div>TX ID: <span id="p-tx"></span></div>
-    <div>วันที่: <span id="p-date"></span></div>
-    <div>พนักงาน: <span id="p-staff"></span></div>
-    <div>ประเภท: <span id="p-action"></span></div>
-    <hr class="border-dashed my-2"/>
-    <div>รายการเดิม:</div>
-    <ul id="p-old-list" class="list-disc pl-4 mb-2"></ul>
-    <div class="text-sm font-bold">ยอดเงินสุทธิ: <span id="p-amount"></span> ฿</div>
-    <div class="text-sm font-bold mt-2">รหัสคูปองใหม่: <span id="p-new-code" class="text-base underline"></span></div>
-    <hr class="border-dashed my-2"/>
-    <div class="text-center text-[10px] text-gray-500">ขอบคุณที่ใช้บริการ</div>
-  </div>
+  <!-- โซนสำหรับพิมพ์สลิปความร้อน 80x80 -->
+  <div id="slip-print-area" class="hidden text-xs leading-tight"></div>
 
   <script>
-    // ตั้งค่า URL และ Key ของ Supabase
     const SUPABASE_URL = "https://xodxqqnjkgnihkpurhdf.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZHhxcW5qa2duaWhrcHVyaGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0Nzk4NzYsImV4cCI6MjEwNTA1NTg3Nn0.6nF_7NURfTJHolexLrpp1QzrwTH67-2gUvAE9pWSMD8";
     const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/tiger-service`;
 
     let supabaseClient = null;
 
-    // เริ่มต้นระบบเมื่อโหลดหน้าจอเสร็จ
     window.addEventListener('DOMContentLoaded', () => {
-      // ตรวจสอบและสร้าง Supabase Client
-      if (window.supabase && typeof window.supabase.createClient === 'function') {
+      if (window.supabase) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      } else {
-        console.error("Supabase SDK โหลดไม่สำเร็จ");
       }
 
-      // ผูก Event ปุ่มสลับแท็บ
       document.getElementById('tab-combine').addEventListener('click', () => switchTab('combine'));
       document.getElementById('tab-cancel').addEventListener('click', () => switchTab('cancel'));
       document.getElementById('tab-report').addEventListener('click', () => switchTab('report'));
 
-      // ผูก Event ปุ่มกดยืนยันต่างๆ
       document.getElementById('btn-combine').addEventListener('click', handleCombine);
       document.getElementById('btn-cancel').addEventListener('click', handleSingleCancel);
       document.getElementById('btn-refresh-history').addEventListener('click', fetchHistory);
     });
 
-    // ฟังก์ชันสลับหน้าแท็บ
     function switchTab(tab) {
-      const tabs = ['combine', 'cancel', 'report'];
-      tabs.forEach(t => {
-        const page = document.getElementById(`page-${t}`);
-        const btn = document.getElementById(`tab-${t}`);
-        if (page && btn) {
-          page.classList.add('hidden');
-          btn.className = "flex-1 py-2 rounded-lg text-gray-600 transition";
-        }
+      ['combine', 'cancel', 'report'].forEach(t => {
+        document.getElementById(`page-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = "flex-1 py-2 rounded-lg text-gray-600 transition";
       });
-
-      const activePage = document.getElementById(`page-${tab}`);
-      const activeBtn = document.getElementById(`tab-${tab}`);
-      if (activePage && activeBtn) {
-        activePage.classList.remove('hidden');
-        activeBtn.className = "flex-1 py-2 rounded-lg bg-white shadow-sm text-blue-600 transition font-bold";
-      }
-
-      if (tab === 'report') {
-        fetchHistory();
-      }
+      document.getElementById(`page-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = "flex-1 py-2 rounded-lg bg-white shadow-sm text-blue-600 transition font-bold";
+      if (tab === 'report') fetchHistory();
     }
 
-    // รวมคูปอง
+    // ฟังก์ชันรวมยอดคูปอง
     async function handleCombine() {
       const staff = document.getElementById('staff_name').value.trim();
       const rawText = document.getElementById('combine-input').value.trim();
-      if (!staff) return alert("กรุณาใส่ชื่อพนักงานด้านบนก่อน");
+      if (!staff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อน");
       if (!rawText) return alert("กรุณากรอกรหัสคูปอง");
 
       const vouchers = rawText.split('\n').map(c => c.trim()).filter(Boolean);
       const btn = document.getElementById('btn-combine');
-      btn.disabled = true; 
-      btn.innerText = "กำลังประมวลผล...";
+      btn.disabled = true; btn.innerText = "กำลังประมวลผล...";
 
       try {
         const res = await fetch(EDGE_FUNCTION_URL, {
@@ -189,10 +161,10 @@
         const data = await res.json();
         if (data.status === "ERROR") throw new Error(data.message);
 
-        alert(`สร้างคูปองใหม่สำเร็จ!\nรหัส: ${data.new_voucher}\nยอดรวม: ${data.total_amount} บาท`);
         document.getElementById('combine-input').value = "";
         
-        printSlip({
+        // พิมพ์สลิป 2 ท่อน
+        renderCombineSlip({
           transaction_id: data.transaction_id,
           created_at: new Date().toISOString(),
           staff_name: staff,
@@ -206,23 +178,21 @@
       } catch (err) {
         alert("เกิดข้อผิดพลาด: " + err.message);
       } finally {
-        btn.disabled = false; 
-        btn.innerText = "ยืนยันการรวมยอดคูปอง";
+        btn.disabled = false; btn.innerText = "ยืนยันการรวมยอดและพิมพ์สลิป";
       }
     }
 
-    // ยกเลิกคูปองเดี่ยว
+    // ฟังก์ชันยกเลิกคูปองเดี่ยว
     async function handleSingleCancel() {
       const staff = document.getElementById('staff_name').value.trim();
       const code = document.getElementById('cancel-input').value.trim();
-      if (!staff) return alert("กรุณาใส่ชื่อพนักงานด้านบนก่อน");
+      if (!staff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อน");
       if (!code) return alert("กรุณากรอกรหัสคูปอง");
 
       if (!confirm(`ยืนยันการยกเลิกคูปอง ${code} หรือไม่?`)) return;
 
       const btn = document.getElementById('btn-cancel');
-      btn.disabled = true; 
-      btn.innerText = "กำลังยกเลิก...";
+      btn.disabled = true; btn.innerText = "กำลังยกเลิก...";
 
       try {
         const res = await fetch(EDGE_FUNCTION_URL, {
@@ -233,23 +203,30 @@
         const data = await res.json();
         if (data.status === "ERROR") throw new Error(data.message);
 
-        alert(data.message);
         document.getElementById('cancel-input').value = "";
+
+        // พิมพ์สลิปยืนยันการยกเลิก
+        renderCancelSlip({
+          transaction_id: "CANCEL-" + Date.now(),
+          created_at: new Date().toISOString(),
+          staff_name: staff,
+          voucher_code: code
+        });
+
       } catch (err) {
         alert("เกิดข้อผิดพลาด: " + err.message);
       } finally {
-        btn.disabled = false; 
-        btn.innerText = "ยืนยันการยกเลิกคูปองนี้";
+        btn.disabled = false; btn.innerText = "ยืนยันการยกเลิกคูปองนี้";
       }
     }
 
-    // ดึงประวัติมาแสดง
+    // ดึงประวัติจาก Supabase
     async function fetchHistory() {
       const tbody = document.getElementById('history-tbody');
       tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>`;
 
       if (!supabaseClient) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">ไม่สามารถเชื่อมต่อฐานข้อมูล Supabase ได้</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">Supabase ไม่พร้อมทำงาน</td></tr>`;
         return;
       }
 
@@ -264,11 +241,6 @@
         return;
       }
 
-      if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีรายการประวัติ</td></tr>`;
-        return;
-      }
-
       window._cachedHistory = data;
       tbody.innerHTML = data.map((row, idx) => `
         <tr class="hover:bg-gray-50 border-b text-xs">
@@ -279,7 +251,7 @@
           <td class="p-3 text-green-700 font-bold">${row.new_voucher_code || '-'}</td>
           <td class="p-3">${row.reprint_count > 0 ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">${row.reprint_count} ครั้ง</span>` : '-'}</td>
           <td class="p-3 text-center">
-            ${row.action_type === 'COMBINE' ? `<button onclick="executeReprintByIndex(${idx})" class="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-black font-sans">🖨️ Reprint</button>` : '-'}
+            <button onclick="executeReprintByIndex(${idx})" class="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-black font-sans">🖨️ Reprint</button>
           </td>
         </tr>
       `).join('');
@@ -291,7 +263,7 @@
       if (!row) return;
 
       const currentStaff = document.getElementById('staff_name').value.trim();
-      if (!currentStaff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อนกด Reprint เพื่อบันทึกประวัติ");
+      if (!currentStaff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อนกด Reprint");
 
       const now = new Date();
       if (supabaseClient) {
@@ -305,37 +277,136 @@
           .eq('id', row.id);
       }
 
-      printSlip({
-        ...row,
-        is_reprint: true,
-        reprint_time: now.toLocaleString('th-TH'),
-        reprinted_by: currentStaff
-      });
+      if (row.action_type === 'COMBINE') {
+        renderCombineSlip({
+          ...row,
+          is_reprint: true,
+          reprint_time: now.toLocaleString('th-TH'),
+          reprinted_by: currentStaff
+        });
+      } else {
+        renderCancelSlip({
+          ...row,
+          voucher_code: row.old_vouchers?.[0]?.code || '-',
+          is_reprint: true,
+          reprint_time: now.toLocaleString('th-TH'),
+          reprinted_by: currentStaff
+        });
+      }
 
       fetchHistory();
     }
 
-    // พิมพ์สลิป
-    function printSlip(item) {
-      document.getElementById('p-tx').innerText = item.transaction_id || '-';
-      document.getElementById('p-date').innerText = new Date(item.created_at).toLocaleString('th-TH');
-      document.getElementById('p-staff').innerText = item.staff_name;
-      document.getElementById('p-action').innerText = item.action_type;
-      document.getElementById('p-amount').innerText = Number(item.total_amount).toLocaleString();
-      document.getElementById('p-new-code').innerText = item.new_voucher_code || '-';
+    // พิมพ์สลิปรวมบิล (2 ท่อน + QR Code)
+    function renderCombineSlip(item) {
+      const area = document.getElementById('slip-print-area');
+      const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
+      const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
+      const oldList = item.old_vouchers || [];
+      const billCount = oldList.length;
+      const newCode = item.new_voucher_code || '';
 
-      const oldList = document.getElementById('p-old-list');
-      oldList.innerHTML = (item.old_vouchers || []).map(v => `<li>${v.code} (${v.amount}฿)</li>`).join('');
-
-      const watermark = document.getElementById('print-watermark');
+      let reprintBanner = '';
       if (item.is_reprint) {
-        watermark.classList.remove('hidden');
-        document.getElementById('print-reprint-time').innerText = `พิมพ์ซ้ำเมื่อ: ${item.reprint_time} โดย ${item.reprinted_by}`;
-      } else {
-        watermark.classList.add('hidden');
+        reprintBanner = `
+          <div style="border: 1px solid #000; padding: 2px; text-align: center; margin-bottom: 4px; font-weight: bold;">
+            *** REPRINT SLIP ***<br>
+            <span style="font-size: 10px;">${item.reprint_time} (โดย ${item.reprinted_by})</span>
+          </div>`;
       }
 
-      window.print();
+      area.innerHTML = `
+        <!-- ส่วนที่ 1: ให้ลูกค้า -->
+        <div style="text-align: center; font-weight: bold; font-size: 14px;">ใบรับเงินรวมคูปอง</div>
+        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(สำหรับลูกค้า)</div>
+        ${reprintBanner}
+        <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
+        <div>พนักงาน: ${item.staff_name}</div>
+        <div>TX ID: ${item.transaction_id}</div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-size: 13px; font-weight: bold;">จำนวนบิลที่รวม: ${billCount} ใบ</div>
+        <div style="font-size: 15px; font-weight: bold; margin-top: 2px;">ยอดรวมสุทธิ: ${Number(item.total_amount).toLocaleString()} บาท</div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="text-align: center; font-size: 10px; margin-bottom: 8px;">กรุณาเก็บเอกสารนี้ไว้เป็นหลักฐาน</div>
+
+        <!-- รอยตัดกระดาษ -->
+        <div style="border-top: 2px dashed #000; text-align: center; margin: 12px 0; font-weight: bold; font-size: 10px;">
+          ✂️ - - - - - - - - ตัดหน้ากระดาษ - - - - - - - -
+        </div>
+
+        <!-- ส่วนที่ 2: ร้านเก็บไว้ พร้อม QR Code 12 หลัก -->
+        <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการรวมคูปอง</div>
+        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(สำหรับพนักงาน / ร้านเก็บไว้)</div>
+        ${reprintBanner}
+        <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
+        <div>พนักงาน: ${item.staff_name} | TX: ${item.transaction_id}</div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-weight: bold;">รายการคูปองเดิมที่ยกเลิก (${billCount} ใบ):</div>
+        <div style="padding-left: 6px; margin: 3px 0;">
+          ${oldList.map((v, i) => `<div>${i+1}. รหัส: ${v.code} | ยอด: ${Number(v.amount).toLocaleString()} ฿</div>`).join('')}
+        </div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-weight: bold;">ยอดเงินรวมที่สร้างใหม่: ${Number(item.total_amount).toLocaleString()} บาท</div>
+        <div style="font-weight: bold; font-size: 13px; margin-top: 2px;">เลขที่เวาเชอร์ใหม่ (12 หลัก):</div>
+        <div style="text-align: center; font-size: 16px; font-weight: bold; letter-spacing: 2px; margin: 4px 0;">
+          ${newCode}
+        </div>
+        
+        <!-- กรอบแสดง QR Code ตรงกลาง -->
+        <div id="qrcode-container" style="display: flex; justify-content: center; margin: 6px 0;"></div>
+        <div style="text-align: center; font-size: 10px; margin-top: 2px;">สแกนเพื่อจ่ายเงิน / ตรวจสอบระบบ</div>
+      `;
+
+      // เจนเนอเรต QR Code
+      const qrContainer = document.getElementById('qrcode-container');
+      qrContainer.innerHTML = "";
+      if (newCode) {
+        new QRCode(qrContainer, {
+          text: newCode,
+          width: 120,
+          height: 120,
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+
+      // หน่วงเวลาเล็กน้อยเพื่อให้ QR Code วาดเสร็จแล้วสั่งพิมพ์
+      setTimeout(() => {
+        window.print();
+      }, 350);
+    }
+
+    // พิมพ์สลิปยืนยันการยกเลิกเดี่ยว
+    function renderCancelSlip(item) {
+      const area = document.getElementById('slip-print-area');
+      const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
+      const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
+
+      let reprintBanner = '';
+      if (item.is_reprint) {
+        reprintBanner = `
+          <div style="border: 1px solid #000; padding: 2px; text-align: center; margin-bottom: 4px; font-weight: bold;">
+            *** REPRINT SLIP ***<br>
+            <span style="font-size: 10px;">${item.reprint_time} (โดย ${item.reprinted_by})</span>
+          </div>`;
+      }
+
+      area.innerHTML = `
+        <div style="text-align: center; font-weight: bold; font-size: 15px;">หลักฐานการยกเลิกคูปอง</div>
+        <div style="text-align: center; font-size: 11px; margin-bottom: 6px;">TIGER CASHBOX SYSTEM</div>
+        ${reprintBanner}
+        <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
+        <div>พนักงาน: ${item.staff_name}</div>
+        <div>TX ID: ${item.transaction_id}</div>
+        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+        <div style="font-size: 13px; font-weight: bold;">สถานะ: ยกเลิกคูปองสำเร็จ (CANCELLED)</div>
+        <div style="font-size: 15px; font-weight: bold; margin: 6px 0;">รหัสคูปอง: ${item.voucher_code}</div>
+        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+        <div style="text-align: center; font-size: 10px;">คูปองนี้ถูกระงับสิทธิ์ในระบบเรียบร้อยแล้ว</div>
+      `;
+
+      setTimeout(() => {
+        window.print();
+      }, 250);
     }
   </script>
 </body>
