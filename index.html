@@ -74,7 +74,7 @@
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b pb-3">
         <div>
           <h2 class="text-lg font-bold text-gray-800">ประวัติการทำรายการ & Reprint</h2>
-          <p class="text-xs text-gray-500">แสดงผลครั้งละ 50 รายการต่อหน้า ตรวจสอบและกดพิมพ์ซ้ำได้</p>
+          <p class="text-xs text-gray-500">แสดงผลครั้งละ 50 รายการต่อหน้า (รหัสคูปองจะถูกซ่อนไว้จนกว่าจะกด Reprint)</p>
         </div>
         <button id="btn-refresh-history" class="text-sm bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-lg border font-medium">🔄 โหลดข้อมูลใหม่</button>
       </div>
@@ -129,6 +129,8 @@
     let totalRecords = 0;
     let supabaseClient = null;
     let cachedRows = [];
+    // เก็บรายการ index ที่ถูกกด reprint ในเซสชันนี้เพื่อแสดงผล
+    const revealedIndices = new Set();
 
     window.addEventListener('DOMContentLoaded', () => {
       try {
@@ -147,6 +149,7 @@
       document.getElementById('btn-cancel').addEventListener('click', handleSingleCancel);
       document.getElementById('btn-refresh-history').addEventListener('click', () => {
         currentPage = 1;
+        revealedIndices.clear();
         fetchHistory();
       });
 
@@ -345,6 +348,7 @@
       
       if (targetPage >= 1 && targetPage <= maxPages) {
         currentPage = targetPage;
+        revealedIndices.clear();
         fetchHistory();
       }
     }
@@ -386,24 +390,46 @@
       }
 
       cachedRows = data;
-      tbody.innerHTML = data.map((row, idx) => `
-        <tr class="hover:bg-gray-50 border-b text-xs">
-          <td class="p-3">${new Date(row.created_at).toLocaleString('th-TH')}</td>
-          <td class="p-3 font-bold ${row.action_type === 'COMBINE' ? 'text-blue-600' : 'text-red-600'}">${row.action_type}</td>
-          <td class="p-3">${row.staff_name}</td>
-          <td class="p-3 font-bold text-gray-700">${row.ref_num && row.ref_num !== 'ERROR' ? row.ref_num : '-'}</td>
-          <td class="p-3 font-bold text-right">${Number(row.total_amount).toLocaleString()} ฿</td>
-          <td class="p-3 text-green-700 font-bold tracking-wider">${row.new_voucher_code || '-'}</td>
-          <td class="p-3 text-center">
-            ${row.reprint_count > 0 ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">${row.reprint_count} ครั้ง</span>` : '-'}
-          </td>
-          <td class="p-3 text-center">
-            <button onclick="triggerReprint(${idx})" class="bg-gray-800 text-white px-3 py-1.5 rounded text-xs hover:bg-black font-sans font-semibold">
-              🖨️ Reprint
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      renderTableRows();
+    }
+
+    function renderTableRows() {
+      const tbody = document.getElementById('history-tbody');
+      tbody.innerHTML = cachedRows.map((row, idx) => {
+        const isRevealed = revealedIndices.has(idx);
+        let voucherDisplay = '-';
+
+        if (row.new_voucher_code) {
+          if (isRevealed) {
+            voucherDisplay = `<span class="text-green-700 font-bold tracking-wider">${row.new_voucher_code}</span>`;
+          } else {
+            voucherDisplay = `
+              <span class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-400 px-2 py-0.5 rounded border border-dashed border-gray-300 text-[11px] font-mono select-none">
+                🔒 ••••••••••••
+              </span>
+            `;
+          }
+        }
+
+        return `
+          <tr class="hover:bg-gray-50 border-b text-xs">
+            <td class="p-3">${new Date(row.created_at).toLocaleString('th-TH')}</td>
+            <td class="p-3 font-bold ${row.action_type === 'COMBINE' ? 'text-blue-600' : 'text-red-600'}">${row.action_type}</td>
+            <td class="p-3">${row.staff_name}</td>
+            <td class="p-3 font-bold text-gray-700">${row.ref_num && row.ref_num !== 'ERROR' ? row.ref_num : '-'}</td>
+            <td class="p-3 font-bold text-right">${Number(row.total_amount).toLocaleString()} ฿</td>
+            <td class="p-3 font-mono">${voucherDisplay}</td>
+            <td class="p-3 text-center">
+              ${row.reprint_count > 0 ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">${row.reprint_count} ครั้ง</span>` : '-'}
+            </td>
+            <td class="p-3 text-center">
+              <button onclick="triggerReprint(${idx})" class="bg-gray-800 text-white px-3 py-1.5 rounded text-xs hover:bg-black font-sans font-semibold">
+                🖨️ Reprint
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     async function triggerReprint(index) {
@@ -412,6 +438,10 @@
 
       const currentStaff = document.getElementById('staff_name').value.trim();
       if (!currentStaff) return alert("⚠️ กรุณาระบุชื่อพนักงานที่ช่องด้านบน เพื่อลงบันทึกว่าใครเป็นผู้สั่ง Reprint");
+
+      if (!confirm(`ยืนยันการพิมพ์ซ้ำ (Reprint) ใช่หรือไม่?\nรายการนี้จะถูกบันทึกชื่อ [${currentStaff}] และเพิ่มจำนวนครั้งการ Reprint ลงในระบบ`)) {
+        return;
+      }
 
       const now = new Date();
       if (supabaseClient) {
@@ -424,6 +454,11 @@
           })
           .eq('id', row.id);
       }
+
+      // ปลดล็อกการแสดงเลขคูปอง 12 หลักเฉพาะแถวที่กด reprint
+      revealedIndices.add(index);
+      row.reprint_count = (row.reprint_count || 0) + 1;
+      renderTableRows();
 
       if (row.action_type === 'COMBINE') {
         buildCombineSlip({
@@ -442,8 +477,6 @@
           reprinted_by: currentStaff
         });
       }
-
-      fetchHistory();
     }
 
     function buildCombineSlip(item) {
