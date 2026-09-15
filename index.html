@@ -6,84 +6,71 @@
   <title>ระบบจัดการคูปอง Tiger Pay</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
-  <!-- ไลบรารีสร้าง QR Code -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <style>
-    @media print {
-      body * { visibility: hidden; }
-      #slip-print-area, #slip-print-area * { visibility: visible; }
-      #slip-print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 78mm;
-        margin: 0;
-        padding: 4px;
-        color: #000 !important;
-        font-family: monospace;
-      }
-      .page-break {
-        page-break-after: always;
-      }
-    }
-  </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
   <div class="max-w-4xl mx-auto p-4 md:p-6">
+    <!-- แถบระบุพนักงาน -->
     <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-200 gap-4">
       <div>
         <h1 class="text-xl font-bold text-gray-900">Tiger Pay Voucher Hub</h1>
-        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด และพิมพ์สลิป 80x80 พร้อม QR Code</p>
+        <p class="text-xs text-gray-500">ระบบยกเลิก รวมยอด ออกสลิป 80x80 พร้อม QR Code 12 หลัก</p>
       </div>
       <div class="flex items-center gap-2 w-full md:w-auto">
         <label class="text-sm font-semibold whitespace-nowrap">พนักงานประจำจุด:</label>
-        <input id="staff_name" type="text" placeholder="เช่น STAFF-01" class="border p-2 rounded-lg text-sm w-full md:w-44 bg-yellow-50 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700"/>
+        <input id="staff_name" type="text" placeholder="ระบุชื่อพนักงาน" class="border p-2 rounded-lg text-sm w-full md:w-48 bg-yellow-50 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-800"/>
       </div>
     </div>
 
-    <!-- แถบเมนู 3 หน้า -->
+    <!-- เมนู 3 แท็บ -->
     <div class="flex bg-gray-200 p-1 rounded-xl mb-6 font-semibold text-sm">
-      <button id="tab-combine" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-blue-600 transition font-bold">1. รวมยอดคูปอง</button>
-      <button id="tab-cancel" class="flex-1 py-2 rounded-lg text-gray-600 transition">2. ยกเลิกคูปองเดี่ยว</button>
-      <button id="tab-report" class="flex-1 py-2 rounded-lg text-gray-600 transition">3. ประวัติ & Reprint</button>
+      <button id="tab-combine" class="flex-1 py-2.5 rounded-lg bg-white shadow-sm text-blue-600 font-bold transition">1. รวมยอดคูปอง</button>
+      <button id="tab-cancel" class="flex-1 py-2.5 rounded-lg text-gray-600 transition">2. ยกเลิกคูปองเดี่ยว</button>
+      <button id="tab-report" class="flex-1 py-2.5 rounded-lg text-gray-600 transition">3. ประวัติ & Reprint</button>
     </div>
 
     <!-- หน้า 1: รวมยอดคูปอง -->
     <div id="page-combine" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-      <h2 class="text-lg font-bold text-gray-800">รวมคูปองหลายใบ เป็นยอดเดียว</h2>
-      <p class="text-xs text-gray-500">ระบบจะยกเลิกคูปองเดิมทั้งหมด ออกยอดใหม่ 1 ใบ พร้อมพิมพ์สลิปแบ่ง 2 ส่วน</p>
+      <div class="border-b pb-3">
+        <h2 class="text-lg font-bold text-gray-800">รวมคูปองหลายใบ เป็นยอดเดียว</h2>
+        <p class="text-xs text-gray-500">ระบบจะยกเลิกคูปองเดิม และออกคูปองใบใหม่ 1 ใบพร้อม QR Code นำไปสแกนที่ตู้จ่ายเงิน</p>
+      </div>
       
       <div class="space-y-2">
-        <label class="text-sm font-medium">รหัสคูปองเดิม (สแกนหรือพิมพ์ใบละบรรทัด):</label>
-        <textarea id="combine-input" rows="4" placeholder="VCH-1001&#10;VCH-1002" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+        <label class="text-sm font-medium">สแกนหรือพิมพ์รหัสคูปองเดิม (แยกใบละบรรทัด):</label>
+        <textarea id="combine-input" rows="5" placeholder="ตัวอย่าง:&#10;275412345678&#10;275487654321" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
       </div>
 
-      <button id="btn-combine" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition">
-        ยืนยันการรวมยอดและพิมพ์สลิป
+      <button id="btn-combine" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow transition text-base">
+        ยืนยันการรวมยอด และพิมพ์สลิปทันที
       </button>
     </div>
 
     <!-- หน้า 2: ยกเลิกคูปองเดี่ยว -->
     <div id="page-cancel" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-      <h2 class="text-lg font-bold text-red-600">ยกเลิกคูปองเดี่ยว</h2>
-      <p class="text-xs text-gray-500">สำหรับคูปองที่ออกผิดพลาด เมื่อยกเลิกสำเร็จจะพิมพ์เอกสารยืนยันให้ทันที</p>
+      <div class="border-b pb-3">
+        <h2 class="text-lg font-bold text-red-600">ยกเลิกคูปองเดี่ยว</h2>
+        <p class="text-xs text-gray-500">พิมพ์ใบยืนยันการระงับสิทธิ์ออกกระดาษความร้อนทันที</p>
+      </div>
 
       <div class="space-y-2">
         <label class="text-sm font-medium">รหัสคูปองที่ต้องการยกเลิก:</label>
-        <input id="cancel-input" type="text" placeholder="สแกนหรือพิมพ์รหัสที่นี่" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-red-500 outline-none"/>
+        <input id="cancel-input" type="text" placeholder="สแกนหรือพิมพ์รหัส 12 หลัก" class="w-full border p-3 rounded-lg font-mono text-sm focus:ring-2 focus:ring-red-500 outline-none"/>
       </div>
 
-      <button id="btn-cancel" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow transition">
+      <button id="btn-cancel" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl shadow transition text-base">
         ยืนยันการยกเลิกคูปองนี้
       </button>
     </div>
 
     <!-- หน้า 3: ประวัติและพิมพ์ซ้ำ -->
     <div id="page-report" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-        <h2 class="text-lg font-bold text-gray-800">ประวัติการทำรายการ & Reprint</h2>
-        <button id="btn-refresh-history" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg border">🔄 โหลดข้อมูลใหม่</button>
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b pb-3">
+        <div>
+          <h2 class="text-lg font-bold text-gray-800">ประวัติการทำรายการ & Reprint</h2>
+          <p class="text-xs text-gray-500">ตรวจสอบย้อนหลังและสั่งพิมพ์สลิปซ้ำได้ตลอดเวลา</p>
+        </div>
+        <button id="btn-refresh-history" class="text-sm bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-lg border font-medium">🔄 โหลดข้อมูลใหม่</button>
       </div>
 
       <div class="overflow-x-auto">
@@ -92,23 +79,20 @@
             <tr class="bg-gray-50 text-gray-600 border-b">
               <th class="p-3">วันที่-เวลา</th>
               <th class="p-3">ประเภท</th>
-              <th class="p-3">ผู้ทำรายการ</th>
-              <th class="p-3">ยอดรวม</th>
-              <th class="p-3">คูปองใหม่</th>
-              <th class="p-3">พิมพ์ซ้ำ</th>
+              <th class="p-3">พนักงาน</th>
+              <th class="p-3 text-right">ยอดรวม</th>
+              <th class="p-3">คูปองใหม่ (12 หลัก)</th>
+              <th class="p-3 text-center">พิมพ์ซ้ำ</th>
               <th class="p-3 text-center">จัดการ</th>
             </tr>
           </thead>
           <tbody id="history-tbody" class="divide-y divide-gray-100 font-mono">
-            <tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีข้อมูล</td></tr>
+            <tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
   </div>
-
-  <!-- โซนสำหรับพิมพ์สลิปความร้อน 80x80 -->
-  <div id="slip-print-area" class="hidden text-xs leading-tight"></div>
 
   <script>
     const SUPABASE_URL = "https://xodxqqnjkgnihkpurhdf.supabase.co";
@@ -116,10 +100,15 @@
     const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/tiger-service`;
 
     let supabaseClient = null;
+    let cachedRows = [];
 
     window.addEventListener('DOMContentLoaded', () => {
-      if (window.supabase) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      try {
+        if (window.supabase) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+      } catch (err) {
+        console.error("Supabase Init Error:", err);
       }
 
       document.getElementById('tab-combine').addEventListener('click', () => switchTab('combine'));
@@ -133,24 +122,106 @@
 
     function switchTab(tab) {
       ['combine', 'cancel', 'report'].forEach(t => {
-        document.getElementById(`page-${t}`).classList.add('hidden');
-        document.getElementById(`tab-${t}`).className = "flex-1 py-2 rounded-lg text-gray-600 transition";
+        const page = document.getElementById(`page-${t}`);
+        const btn = document.getElementById(`tab-${t}`);
+        if (page && btn) {
+          page.classList.add('hidden');
+          btn.className = "flex-1 py-2.5 rounded-lg text-gray-600 transition";
+        }
       });
-      document.getElementById(`page-${tab}`).classList.remove('hidden');
-      document.getElementById(`tab-${tab}`).className = "flex-1 py-2 rounded-lg bg-white shadow-sm text-blue-600 transition font-bold";
-      if (tab === 'report') fetchHistory();
+
+      const activePage = document.getElementById(`page-${tab}`);
+      const activeBtn = document.getElementById(`tab-${tab}`);
+      if (activePage && activeBtn) {
+        activePage.classList.remove('hidden');
+        activeBtn.className = "flex-1 py-2.5 rounded-lg bg-white shadow-sm text-blue-600 font-bold transition";
+      }
+
+      if (tab === 'report') {
+        fetchHistory();
+      }
     }
 
-    // ฟังก์ชันรวมยอดคูปอง
+    // ฟังก์ชันพิมพ์สลิปผ่านหน้าต่างแยก (แก้ปัญหาหน้าขาว 100%)
+    function printHtmlSlip(htmlContent) {
+      const printWindow = window.open('', '_blank', 'width=350,height=600');
+      if (!printWindow) {
+        alert("⚠️ เบราว์เซอร์บล็อก Popup หน้าต่างพิมพ์ กรุณากดอนุญาต (Allow popups) สำหรับหน้านี้");
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Slip Print</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            body {
+              width: 74mm;
+              margin: 0;
+              padding: 4mm 3mm;
+              font-family: 'Courier New', Courier, monospace;
+              color: #000;
+              font-size: 11px;
+              line-height: 1.3;
+              box-sizing: border-box;
+            }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+          <script>
+            // ตรวจสอบว่ามีรูปภาพ (QR Code) หรือไม่ ถ้ารูปโหลดเสร็จค่อยสั่งพิมพ์
+            const images = document.images;
+            if (images.length > 0) {
+              let loaded = 0;
+              for (let img of images) {
+                if (img.complete) {
+                  loaded++;
+                  if (loaded === images.length) executePrint();
+                } else {
+                  img.onload = () => {
+                    loaded++;
+                    if (loaded === images.length) executePrint();
+                  };
+                  img.onerror = () => executePrint();
+                }
+              }
+            } else {
+              executePrint();
+            }
+
+            function executePrint() {
+              setTimeout(() => {
+                window.focus();
+                window.print();
+                window.close();
+              }, 250);
+            }
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+
+    // 1. รวมยอดคูปอง
     async function handleCombine() {
       const staff = document.getElementById('staff_name').value.trim();
       const rawText = document.getElementById('combine-input').value.trim();
-      if (!staff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อน");
-      if (!rawText) return alert("กรุณากรอกรหัสคูปอง");
+      if (!staff) return alert("⚠️ กรุณาระบุชื่อพนักงานที่ช่องด้านบนก่อนเริ่มทำรายการ");
+      if (!rawText) return alert("⚠️ กรุณากรอกรหัสคูปองอย่างน้อย 1 ใบ");
 
       const vouchers = rawText.split('\n').map(c => c.trim()).filter(Boolean);
       const btn = document.getElementById('btn-combine');
-      btn.disabled = true; btn.innerText = "กำลังประมวลผล...";
+      btn.disabled = true;
+      btn.innerText = "กำลังประมวลผลระบบ Tiger Pay...";
 
       try {
         const res = await fetch(EDGE_FUNCTION_URL, {
@@ -159,12 +230,11 @@
           body: JSON.stringify({ action: "COMBINE", staff_name: staff, vouchers })
         });
         const data = await res.json();
-        if (data.status === "ERROR") throw new Error(data.message);
+        if (data.status === "ERROR" || data.error) throw new Error(data.message || data.error);
 
         document.getElementById('combine-input').value = "";
         
-        // พิมพ์สลิป 2 ท่อน
-        renderCombineSlip({
+        renderAndPrintCombineSlip({
           transaction_id: data.transaction_id,
           created_at: new Date().toISOString(),
           staff_name: staff,
@@ -178,21 +248,23 @@
       } catch (err) {
         alert("เกิดข้อผิดพลาด: " + err.message);
       } finally {
-        btn.disabled = false; btn.innerText = "ยืนยันการรวมยอดและพิมพ์สลิป";
+        btn.disabled = false;
+        btn.innerText = "ยืนยันการรวมยอด และพิมพ์สลิปทันที";
       }
     }
 
-    // ฟังก์ชันยกเลิกคูปองเดี่ยว
+    // 2. ยกเลิกคูปองเดี่ยว
     async function handleSingleCancel() {
       const staff = document.getElementById('staff_name').value.trim();
       const code = document.getElementById('cancel-input').value.trim();
-      if (!staff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อน");
-      if (!code) return alert("กรุณากรอกรหัสคูปอง");
+      if (!staff) return alert("⚠️ กรุณาระบุชื่อพนักงานที่ช่องด้านบนก่อน");
+      if (!code) return alert("⚠️ กรุณากรอกรหัสคูปองที่ต้องการยกเลิก");
 
-      if (!confirm(`ยืนยันการยกเลิกคูปอง ${code} หรือไม่?`)) return;
+      if (!confirm(`ยืนยันที่จะยกเลิกคูปองรหัส "${code}" ใช่หรือไม่?`)) return;
 
       const btn = document.getElementById('btn-cancel');
-      btn.disabled = true; btn.innerText = "กำลังยกเลิก...";
+      btn.disabled = true;
+      btn.innerText = "กำลังยกเลิกในระบบ...";
 
       try {
         const res = await fetch(EDGE_FUNCTION_URL, {
@@ -201,32 +273,33 @@
           body: JSON.stringify({ action: "CANCEL_SINGLE", staff_name: staff, single_code: code })
         });
         const data = await res.json();
-        if (data.status === "ERROR") throw new Error(data.message);
+        if (data.status === "ERROR" || data.error) throw new Error(data.message || data.error);
 
         document.getElementById('cancel-input').value = "";
 
-        // พิมพ์สลิปยืนยันการยกเลิก
-        renderCancelSlip({
+        renderAndPrintCancelSlip({
           transaction_id: "CANCEL-" + Date.now(),
           created_at: new Date().toISOString(),
           staff_name: staff,
-          voucher_code: code
+          voucher_code: code,
+          is_reprint: false
         });
 
       } catch (err) {
         alert("เกิดข้อผิดพลาด: " + err.message);
       } finally {
-        btn.disabled = false; btn.innerText = "ยืนยันการยกเลิกคูปองนี้";
+        btn.disabled = false;
+        btn.innerText = "ยืนยันการยกเลิกคูปองนี้";
       }
     }
 
-    // ดึงประวัติจาก Supabase
+    // 3. ดึงประวัติรายการ
     async function fetchHistory() {
       const tbody = document.getElementById('history-tbody');
-      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลด...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังดึงข้อมูลจากระบบ...</td></tr>`;
 
       if (!supabaseClient) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">Supabase ไม่พร้อมทำงาน</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500 font-bold">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</td></tr>`;
         return;
       }
 
@@ -234,36 +307,45 @@
         .from('voucher_transactions')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(40);
 
-      if (error || !data) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">โหลดประวัติไม่สำเร็จ: ${error?.message || ''}</td></tr>`;
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500 font-bold">โหลดข้อมูลล้มเหลว: ${error.message}</td></tr>`;
         return;
       }
 
-      window._cachedHistory = data;
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีรายการบันทึกในระบบ</td></tr>`;
+        return;
+      }
+
+      cachedRows = data;
       tbody.innerHTML = data.map((row, idx) => `
         <tr class="hover:bg-gray-50 border-b text-xs">
           <td class="p-3">${new Date(row.created_at).toLocaleString('th-TH')}</td>
           <td class="p-3 font-bold ${row.action_type === 'COMBINE' ? 'text-blue-600' : 'text-red-600'}">${row.action_type}</td>
           <td class="p-3">${row.staff_name}</td>
-          <td class="p-3 font-bold">${Number(row.total_amount).toLocaleString()} ฿</td>
-          <td class="p-3 text-green-700 font-bold">${row.new_voucher_code || '-'}</td>
-          <td class="p-3">${row.reprint_count > 0 ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">${row.reprint_count} ครั้ง</span>` : '-'}</td>
+          <td class="p-3 font-bold text-right">${Number(row.total_amount).toLocaleString()} ฿</td>
+          <td class="p-3 text-green-700 font-bold tracking-wider">${row.new_voucher_code || '-'}</td>
           <td class="p-3 text-center">
-            <button onclick="executeReprintByIndex(${idx})" class="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-black font-sans">🖨️ Reprint</button>
+            ${row.reprint_count > 0 ? `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">${row.reprint_count} ครั้ง</span>` : '-'}
+          </td>
+          <td class="p-3 text-center">
+            <button onclick="triggerReprint(${idx})" class="bg-gray-800 text-white px-3 py-1.5 rounded text-xs hover:bg-black font-sans font-semibold">
+              🖨️ Reprint
+            </button>
           </td>
         </tr>
       `).join('');
     }
 
-    // จัดการ Reprint
-    async function executeReprintByIndex(index) {
-      const row = window._cachedHistory ? window._cachedHistory[index] : null;
+    // พิมพ์ซ้ำ (Reprint)
+    async function triggerReprint(index) {
+      const row = cachedRows[index];
       if (!row) return;
 
       const currentStaff = document.getElementById('staff_name').value.trim();
-      if (!currentStaff) return alert("กรุณาระบุชื่อพนักงานด้านบนก่อนกด Reprint");
+      if (!currentStaff) return alert("⚠️ กรุณาระบุชื่อพนักงานที่ช่องด้านบน เพื่อลงบันทึกว่าใครเป็นผู้สั่ง Reprint");
 
       const now = new Date();
       if (supabaseClient) {
@@ -278,14 +360,14 @@
       }
 
       if (row.action_type === 'COMBINE') {
-        renderCombineSlip({
+        renderAndPrintCombineSlip({
           ...row,
           is_reprint: true,
           reprint_time: now.toLocaleString('th-TH'),
           reprinted_by: currentStaff
         });
       } else {
-        renderCancelSlip({
+        renderAndPrintCancelSlip({
           ...row,
           voucher_code: row.old_vouchers?.[0]?.code || '-',
           is_reprint: true,
@@ -297,116 +379,104 @@
       fetchHistory();
     }
 
-    // พิมพ์สลิปรวมบิล (2 ท่อน + QR Code)
-    function renderCombineSlip(item) {
-      const area = document.getElementById('slip-print-area');
+    // สร้างเนื้อหาสลิปรวมยอด (2 ส่วน + QR Code)
+    function renderAndPrintCombineSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
       const oldList = item.old_vouchers || [];
       const billCount = oldList.length;
-      const newCode = item.new_voucher_code || '';
+      const newCode = (item.new_voucher_code || '').trim();
 
-      let reprintBanner = '';
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(newCode)}`;
+
+      let reprintHeader = '';
       if (item.is_reprint) {
-        reprintBanner = `
-          <div style="border: 1px solid #000; padding: 2px; text-align: center; margin-bottom: 4px; font-weight: bold;">
+        reprintHeader = `
+          <div style="border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px; font-weight: bold;">
             *** REPRINT SLIP ***<br>
-            <span style="font-size: 10px;">${item.reprint_time} (โดย ${item.reprinted_by})</span>
+            <span style="font-size: 10px;">พิมพ์ซ้ำ: ${item.reprint_time}<br>โดย: ${item.reprinted_by}</span>
           </div>`;
       }
 
-      area.innerHTML = `
+      const html = `
         <!-- ส่วนที่ 1: ให้ลูกค้า -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">ใบรับเงินรวมคูปอง</div>
-        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(สำหรับลูกค้า)</div>
-        ${reprintBanner}
+        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(เอกสารสำหรับลูกค้า)</div>
+        ${reprintHeader}
         <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
         <div>พนักงาน: ${item.staff_name}</div>
-        <div>TX ID: ${item.transaction_id}</div>
+        <div>TX: ${item.transaction_id}</div>
         <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
         <div style="font-size: 13px; font-weight: bold;">จำนวนบิลที่รวม: ${billCount} ใบ</div>
         <div style="font-size: 15px; font-weight: bold; margin-top: 2px;">ยอดรวมสุทธิ: ${Number(item.total_amount).toLocaleString()} บาท</div>
         <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
-        <div style="text-align: center; font-size: 10px; margin-bottom: 8px;">กรุณาเก็บเอกสารนี้ไว้เป็นหลักฐาน</div>
+        <div style="text-align: center; font-size: 10px;">โปรดเก็บเอกสารนี้ไว้เป็นหลักฐาน</div>
 
         <!-- รอยตัดกระดาษ -->
-        <div style="border-top: 2px dashed #000; text-align: center; margin: 12px 0; font-weight: bold; font-size: 10px;">
-          ✂️ - - - - - - - - ตัดหน้ากระดาษ - - - - - - - -
+        <div style="border-top: 2px dashed #000; text-align: center; margin: 16px 0 14px 0; font-weight: bold; font-size: 11px;">
+          ✂️ - - - - - - ตัดหน้ากระดาษ - - - - - -
         </div>
 
-        <!-- ส่วนที่ 2: ร้านเก็บไว้ พร้อม QR Code 12 หลัก -->
+        <!-- ส่วนที่ 2: ร้านเก็บไว้ (พร้อม QR Code) -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการรวมคูปอง</div>
-        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(สำหรับพนักงาน / ร้านเก็บไว้)</div>
-        ${reprintBanner}
+        <div style="text-align: center; font-size: 11px; margin-bottom: 4px;">(ร้านเก็บไว้ / นำไปสแกนที่ตู้)</div>
+        ${reprintHeader}
         <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
         <div>พนักงาน: ${item.staff_name} | TX: ${item.transaction_id}</div>
         <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
         <div style="font-weight: bold;">รายการคูปองเดิมที่ยกเลิก (${billCount} ใบ):</div>
-        <div style="padding-left: 6px; margin: 3px 0;">
-          ${oldList.map((v, i) => `<div>${i+1}. รหัส: ${v.code} | ยอด: ${Number(v.amount).toLocaleString()} ฿</div>`).join('')}
+        <div style="padding-left: 4px; margin: 4px 0;">
+          ${oldList.map((v, i) => `<div>${i+1}. ${v.code} : ${Number(v.amount).toLocaleString()} ฿</div>`).join('')}
         </div>
         <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
-        <div style="font-weight: bold;">ยอดเงินรวมที่สร้างใหม่: ${Number(item.total_amount).toLocaleString()} บาท</div>
-        <div style="font-weight: bold; font-size: 13px; margin-top: 2px;">เลขที่เวาเชอร์ใหม่ (12 หลัก):</div>
-        <div style="text-align: center; font-size: 16px; font-weight: bold; letter-spacing: 2px; margin: 4px 0;">
+        <div style="font-size: 13px; font-weight: bold;">ยอดเงินรวมที่สร้างใหม่: ${Number(item.total_amount).toLocaleString()} บาท</div>
+        <div style="font-size: 12px; font-weight: bold; margin-top: 4px;">เลขที่เวาเชอร์ใหม่ (12 หลัก):</div>
+        <div style="text-align: center; font-size: 17px; font-weight: bold; letter-spacing: 2px; margin: 4px 0;">
           ${newCode}
         </div>
         
-        <!-- กรอบแสดง QR Code ตรงกลาง -->
-        <div id="qrcode-container" style="display: flex; justify-content: center; margin: 6px 0;"></div>
-        <div style="text-align: center; font-size: 10px; margin-top: 2px;">สแกนเพื่อจ่ายเงิน / ตรวจสอบระบบ</div>
+        <div style="text-align: center; margin: 8px 0;">
+          <img src="${qrImageUrl}" style="width: 140px; height: 140px; margin: 0 auto; display: block;" alt="Voucher QR" />
+        </div>
+        <div style="text-align: center; font-size: 10px;">สแกน QR Code นี้ที่ช่องอ่านตู้จ่ายเงิน</div>
+        <div style="height: 15px;"></div>
       `;
 
-      // เจนเนอเรต QR Code
-      const qrContainer = document.getElementById('qrcode-container');
-      qrContainer.innerHTML = "";
-      if (newCode) {
-        new QRCode(qrContainer, {
-          text: newCode,
-          width: 120,
-          height: 120,
-          correctLevel: QRCode.CorrectLevel.M
-        });
-      }
-
-      // หน่วงเวลาเล็กน้อยเพื่อให้ QR Code วาดเสร็จแล้วสั่งพิมพ์
-      setTimeout(() => {
-        window.print();
-      }, 350);
+      printHtmlSlip(html);
     }
 
-    // พิมพ์สลิปยืนยันการยกเลิกเดี่ยว
-    function renderCancelSlip(item) {
-      const area = document.getElementById('slip-print-area');
+    // สร้างเนื้อหาสลิปยกเลิกเดี่ยว
+    function renderAndPrintCancelSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
 
-      let reprintBanner = '';
+      let reprintHeader = '';
       if (item.is_reprint) {
-        reprintBanner = `
-          <div style="border: 1px solid #000; padding: 2px; text-align: center; margin-bottom: 4px; font-weight: bold;">
+        reprintHeader = `
+          <div style="border: 2px solid #000; padding: 4px; text-align: center; margin-bottom: 6px; font-weight: bold;">
             *** REPRINT SLIP ***<br>
-            <span style="font-size: 10px;">${item.reprint_time} (โดย ${item.reprinted_by})</span>
+            <span style="font-size: 10px;">พิมพ์ซ้ำ: ${item.reprint_time}<br>โดย: ${item.reprinted_by}</span>
           </div>`;
       }
 
-      area.innerHTML = `
-        <div style="text-align: center; font-weight: bold; font-size: 15px;">หลักฐานการยกเลิกคูปอง</div>
-        <div style="text-align: center; font-size: 11px; margin-bottom: 6px;">TIGER CASHBOX SYSTEM</div>
-        ${reprintBanner}
+      const html = `
+        <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการยกเลิกคูปอง</div>
+        <div style="text-align: center; font-size: 11px; margin-bottom: 6px;">(TIGER PAY CASHBOX)</div>
+        ${reprintHeader}
         <div>วันที่: ${formattedDate} เวลา: ${formattedTime}</div>
         <div>พนักงาน: ${item.staff_name}</div>
-        <div>TX ID: ${item.transaction_id}</div>
-        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
-        <div style="font-size: 13px; font-weight: bold;">สถานะ: ยกเลิกคูปองสำเร็จ (CANCELLED)</div>
-        <div style="font-size: 15px; font-weight: bold; margin: 6px 0;">รหัสคูปอง: ${item.voucher_code}</div>
-        <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+        <div>TX: ${item.transaction_id}</div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+        <div style="font-size: 13px; font-weight: bold;">สถานะ: ยกเลิกคูปองสำเร็จ (VOID)</div>
+        <div style="font-size: 15px; font-weight: bold; margin: 6px 0; letter-spacing: 1px;">
+          รหัส: ${item.voucher_code}
+        </div>
+        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
         <div style="text-align: center; font-size: 10px;">คูปองนี้ถูกระงับสิทธิ์ในระบบเรียบร้อยแล้ว</div>
+        <div style="height: 15px;"></div>
       `;
 
-      setTimeout(() => {
-        window.print();
-      }, 250);
+      printHtmlSlip(html);
     }
   </script>
 </body>
