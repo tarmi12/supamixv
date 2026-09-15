@@ -69,12 +69,12 @@
       </button>
     </div>
 
-    <!-- หน้า 3: ประวัติ & Reprint -->
+    <!-- หน้า 3: ประวัติ & Reprint (แบ่งหน้าละ 50 รายการ) -->
     <div id="page-report" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b pb-3">
         <div>
           <h2 class="text-lg font-bold text-gray-800">ประวัติการทำรายการ & Reprint</h2>
-          <p class="text-xs text-gray-500">ตรวจสอบย้อนหลังและสั่งพิมพ์สลิปซ้ำได้ตลอดเวลา</p>
+          <p class="text-xs text-gray-500">แสดงผลครั้งละ 50 รายการต่อหน้า ตรวจสอบและกดพิมพ์ซ้ำได้</p>
         </div>
         <button id="btn-refresh-history" class="text-sm bg-gray-100 hover:bg-gray-200 px-3.5 py-2 rounded-lg border font-medium">🔄 โหลดข้อมูลใหม่</button>
       </div>
@@ -98,6 +98,24 @@
           </tbody>
         </table>
       </div>
+
+      <!-- แถบควบคุมเปลี่ยนหน้า (Pagination) -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t text-sm">
+        <div id="page-info" class="text-xs text-gray-500 font-medium">
+          กำลังคำนวณจำนวนหน้า...
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-prev-page" class="px-3.5 py-1.5 border rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs">
+            ◀ หน้าก่อนหน้า
+          </button>
+          <span id="page-indicator" class="font-bold text-xs px-2.5 py-1 bg-gray-100 rounded border">
+            หน้า 1
+          </span>
+          <button id="btn-next-page" class="px-3.5 py-1.5 border rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs">
+            หน้าถัดไป ▶
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -106,6 +124,9 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZHhxcW5qa2duaWhrcHVyaGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0Nzk4NzYsImV4cCI6MjEwNTA1NTg3Nn0.6nF_7NURfTJHolexLrpp1QzrwTH67-2gUvAE9pWSMD8";
     const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/tiger-service`;
 
+    const PAGE_SIZE = 50;
+    let currentPage = 1;
+    let totalRecords = 0;
     let supabaseClient = null;
     let cachedRows = [];
 
@@ -124,7 +145,13 @@
 
       document.getElementById('btn-combine').addEventListener('click', handleCombine);
       document.getElementById('btn-cancel').addEventListener('click', handleSingleCancel);
-      document.getElementById('btn-refresh-history').addEventListener('click', fetchHistory);
+      document.getElementById('btn-refresh-history').addEventListener('click', () => {
+        currentPage = 1;
+        fetchHistory();
+      });
+
+      document.getElementById('btn-prev-page').addEventListener('click', () => changePage(-1));
+      document.getElementById('btn-next-page').addEventListener('click', () => changePage(1));
     });
 
     function switchTab(tab) {
@@ -147,7 +174,6 @@
       if (tab === 'report') fetchHistory();
     }
 
-    // ฟังก์ชันพิมพ์ผ่าน Iframe
     function printViaIframe(contentHtml) {
       const oldIframe = document.getElementById('receipt-print-frame');
       if (oldIframe) oldIframe.remove();
@@ -217,7 +243,6 @@
       }
     }
 
-    // 1. รวมยอดคูปอง
     async function handleCombine() {
       const staff = document.getElementById('staff_name').value.trim();
       const billNo = document.getElementById('combine-bill-no').value.trim() || '-';
@@ -245,7 +270,6 @@
         const data = await res.json();
         if (data.status === "ERROR" || data.error) throw new Error(data.message || data.error);
 
-        // อัปเดต bill_no ลงในฐานข้อมูล Supabase เพื่อให้ Reprint แล้วยังมีเลขบิล
         if (supabaseClient && data.transaction_id) {
           await supabaseClient
             .from('voucher_transactions')
@@ -276,7 +300,6 @@
       }
     }
 
-    // 2. ยกเลิกเดี่ยว
     async function handleSingleCancel() {
       const staff = document.getElementById('staff_name').value.trim();
       const code = document.getElementById('cancel-input').value.trim();
@@ -316,29 +339,49 @@
       }
     }
 
-    // 3. ดึงประวัติ
+    function changePage(direction) {
+      const maxPages = Math.ceil(totalRecords / PAGE_SIZE) || 1;
+      const targetPage = currentPage + direction;
+      
+      if (targetPage >= 1 && targetPage <= maxPages) {
+        currentPage = targetPage;
+        fetchHistory();
+      }
+    }
+
     async function fetchHistory() {
       const tbody = document.getElementById('history-tbody');
-      tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">กำลังดึงข้อมูล...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">กำลังดึงข้อมูลหน้า ${currentPage}...</td></tr>`;
 
       if (!supabaseClient) {
         tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500 font-bold">ไม่สามารถเชื่อมต่อฐานข้อมูลได้</td></tr>`;
         return;
       }
 
-      const { data, error } = await supabaseClient
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, count, error } = await supabaseClient
         .from('voucher_transactions')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(40);
+        .range(from, to);
 
       if (error) {
         tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-red-500 font-bold">โหลดข้อมูลล้มเหลว: ${error.message}</td></tr>`;
         return;
       }
 
+      totalRecords = count || 0;
+      const maxPages = Math.ceil(totalRecords / PAGE_SIZE) || 1;
+
+      document.getElementById('page-indicator').innerText = `หน้า ${currentPage} / ${maxPages}`;
+      document.getElementById('page-info').innerText = `แสดงรายการที่ ${totalRecords === 0 ? 0 : from + 1} - ${Math.min(to + 1, totalRecords)} จากทั้งหมด ${totalRecords.toLocaleString()} รายการ`;
+      document.getElementById('btn-prev-page').disabled = (currentPage <= 1);
+      document.getElementById('btn-next-page').disabled = (currentPage >= maxPages);
+
       if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">ยังไม่มีรายการบันทึกในระบบ</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">ไม่มีรายการในหน้านี้</td></tr>`;
         return;
       }
 
@@ -363,7 +406,6 @@
       `).join('');
     }
 
-    // สั่ง Reprint
     async function triggerReprint(index) {
       const row = cachedRows[index];
       if (!row) return;
@@ -404,7 +446,6 @@
       fetchHistory();
     }
 
-    // ฟังก์ชันสร้างสลิปรวมบิล (เพิ่มแจกแจงยอดบิลลูกค้า + QR ขนาดกะทัดรัด 90px)
     function buildCombineSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
@@ -413,7 +454,6 @@
       const newCode = (item.new_voucher_code || '').trim();
       const billNo = item.bill_no || '-';
 
-      // ย่อขนาด QR Code เป็น 90x90 เพื่อให้พอดีกับหัวอ่าน ไม่ใหญ่เกะกะ
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=95x95&margin=0&data=${encodeURIComponent(newCode)}`;
 
       let reprintHeader = '';
@@ -426,7 +466,6 @@
       }
 
       const html = `
-        <!-- ส่วนที่ 1: ให้ลูกค้า (แสดงรายการยอดเงินที่รวม และเลขที่บิล) -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">ใบรับเงินรวมคูปอง</div>
         <div style="text-align: center; font-size: 10px; margin-bottom: 4px;">(เอกสารสำหรับลูกค้า)</div>
         ${reprintHeader}
@@ -454,12 +493,10 @@
         <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
         <div style="text-align: center; font-size: 10px;">โปรดเก็บเอกสารนี้ไว้เป็นหลักฐาน</div>
 
-        <!-- รอยตัดหน้ากระดาษ -->
         <div style="border-top: 2px dashed #000; text-align: center; margin: 16px 0 12px 0; font-weight: bold; font-size: 11px;">
           ✂️ - - - - - - ตัดหน้ากระดาษ - - - - - -
         </div>
 
-        <!-- ส่วนที่ 2: ร้านเก็บไว้ (พร้อม QR Code ขนาดกะทัดรัด) -->
         <div style="text-align: center; font-weight: bold; font-size: 14px;">หลักฐานการรวมคูปอง</div>
         <div style="text-align: center; font-size: 10px; margin-bottom: 4px;">(ร้านเก็บไว้ / สแกนที่ตู้จ่ายเงิน)</div>
         ${reprintHeader}
@@ -478,7 +515,6 @@
           ${newCode}
         </div>
         
-        <!-- รูป QR Code กะทัดรัด (95x95px) -->
         <div style="text-align: center; margin: 6px 0;">
           <img src="${qrImageUrl}" style="width: 95px; height: 95px; margin: 0 auto; display: block;" alt="QR Code" />
         </div>
@@ -489,7 +525,6 @@
       printViaIframe(html);
     }
 
-    // ฟังก์ชันพิมพ์สลิปยกเลิกเดี่ยว
     function buildCancelSlip(item) {
       const formattedDate = new Date(item.created_at).toLocaleDateString('th-TH');
       const formattedTime = new Date(item.created_at).toLocaleTimeString('th-TH');
