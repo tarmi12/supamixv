@@ -25,7 +25,7 @@
         top: 0 !important;
         width: 76mm !important;
         margin: 0 !important;
-        padding: 2mm !important;
+        padding: 0 !important;
         background-color: #ffffff !important;
         color: #000000 !important;
       }
@@ -33,11 +33,17 @@
         size: 80mm auto;
         margin: 0;
       }
+      /* คำสั่งตัดกระดาษผ่านการขึ้นหน้าใหม่ของ thermal printer */
+      .page-break {
+        page-break-after: always !important;
+        break-after: page !important;
+      }
     }
     .thermal-doc {
       font-family: 'Tahoma', 'Arial', sans-serif;
       color: #000000 !important;
       line-height: 1.35;
+      padding: 2mm;
     }
   </style>
 </head>
@@ -136,7 +142,7 @@
       <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
         <div>
           <h2 class="text-xl font-black text-slate-900">ประวัติการทำรายการ</h2>
-          <p class="text-sm text-slate-500 mt-0.5">50 รายการล่าสุด (ซ่อนรหัสคูปองเพื่อความปลอดภัย)</p>
+          <p class="text-sm text-slate-500 mt-0.5">แสดงครั้งละ 20 รายการ (ซ่อนรหัสคูปองเพื่อความปลอดภัย)</p>
         </div>
         <button type="button" onclick="loadStaffHistory()" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold px-4 py-2 rounded-xl text-sm transition">
           รีเฟรชตาราง
@@ -160,6 +166,22 @@
           <tbody id="staff-history-rows" class="divide-y divide-slate-200 font-medium"></tbody>
         </table>
       </div>
+
+      <!-- ส่วนควบคุมการเปลี่ยนหน้า Pagination -->
+      <div id="history-pagination" class="flex items-center justify-between border-t border-slate-200 pt-4 mt-4 hidden">
+        <div class="text-sm text-slate-600 font-medium" id="history-page-info">
+          กำลังแสดงรายการ...
+        </div>
+        <div class="flex gap-2">
+          <button type="button" id="btn-prev-page" onclick="changeHistoryPage(-1)" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">
+            &larr; ก่อนหน้า
+          </button>
+          <span id="history-page-num" class="px-3 py-1.5 font-bold text-sm text-slate-800">1</span>
+          <button type="button" id="btn-next-page" onclick="changeHistoryPage(1)" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">
+            ถัดไป &rarr;
+          </button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -170,6 +192,11 @@
   <script>
     const EDGE_FUNCTION_URL = "https://vwsidnehgijyinuxqzqy.supabase.co/functions/v1/tiger-api";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3c2lkbmVoZ2lqeWludXhxenF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjI4MjcsImV4cCI6MjEwNTEzODgyN30.NiTeJBRKXAj3uy_32FtH--MupCyTNG2YpVypIsleyF8";
+
+    // สำหรับจัดการ Pagination
+    let historyAllData = [];
+    let currentHistoryPage = 1;
+    const itemsPerPage = 20;
 
     // ฟังก์ชันทำความสะอาดรหัสคูปอง 12 หลัก
     function cleanVoucherInput(el) {
@@ -361,9 +388,11 @@
       }
     }
 
-    // โหลดประวัติ (ซ่อนรหัสคูปองเต็มไว้เพื่อความปลอดภัย)
+    // โหลดประวัติ
     async function loadStaffHistory() {
       const tbody = document.getElementById('staff-history-rows');
+      const pag = document.getElementById('history-pagination');
+      pag.classList.add('hidden');
       tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 font-bold">กำลังโหลดประวัติ...</td></tr>`;
 
       try {
@@ -373,27 +402,58 @@
           return;
         }
 
-        tbody.innerHTML = data.map(item => `
-          <tr class="hover:bg-slate-50 border-b border-slate-200">
-            <td class="p-3.5">${new Date(item.created_at).toLocaleString('th-TH')}</td>
-            <td class="p-3.5 font-mono font-bold text-slate-900">${item.transaction_id}<br><span class="text-slate-400 text-xs font-normal">${item.ref_num}</span></td>
-            <td class="p-3.5">
-              <span class="px-2.5 py-1 rounded text-xs font-black ${item.action_type === 'COMBINE' ? 'bg-amber-100 text-amber-800' : (item.action_type === 'OWNER_REISSUE' ? 'bg-purple-100 text-purple-800' : 'bg-rose-100 text-rose-800')}">
-                ${item.action_type}
-              </span>
-            </td>
-            <td class="p-3.5">${item.staff_name}</td>
-            <td class="p-3.5 font-black text-slate-900">${parseFloat(item.total_amount).toFixed(2)}</td>
-            <td class="p-3.5 font-mono text-slate-400">${item.new_voucher_code ? '••••••••' + item.new_voucher_code.slice(-4) : '-'}</td>
-            <td class="p-3.5 text-center font-bold">${item.reprint_count}</td>
-            <td class="p-3.5 text-right">
-              <button type="button" onclick='reprintStaffRecord(${JSON.stringify(item)})' class="bg-slate-800 hover:bg-black text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition">Reprint</button>
-            </td>
-          </tr>
-        `).join('');
+        historyAllData = data;
+        currentHistoryPage = 1;
+        renderHistoryPage();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-rose-500 font-bold">โหลดข้อมูลล้มเหลว: ${err.message}</td></tr>`;
       }
+    }
+
+    // ฟังก์ชันเรนเดอร์ข้อมูลแยกตามหน้าละ 20 รายการ
+    function renderHistoryPage() {
+      const tbody = document.getElementById('staff-history-rows');
+      const pag = document.getElementById('history-pagination');
+      const totalItems = historyAllData.length;
+      const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+      if (currentHistoryPage < 1) currentHistoryPage = 1;
+      if (currentHistoryPage > totalPages) currentHistoryPage = totalPages;
+
+      const startIndex = (currentHistoryPage - 1) * itemsPerPage;
+      const pageData = historyAllData.slice(startIndex, startIndex + itemsPerPage);
+
+      tbody.innerHTML = pageData.map(item => `
+        <tr class="hover:bg-slate-50 border-b border-slate-200">
+          <td class="p-3.5">${new Date(item.created_at).toLocaleString('th-TH')}</td>
+          <td class="p-3.5 font-mono font-bold text-slate-900">${item.transaction_id}<br><span class="text-slate-400 text-xs font-normal">${item.ref_num}</span></td>
+          <td class="p-3.5">
+            <span class="px-2.5 py-1 rounded text-xs font-black ${item.action_type === 'COMBINE' ? 'bg-amber-100 text-amber-800' : (item.action_type === 'OWNER_REISSUE' ? 'bg-purple-100 text-purple-800' : 'bg-rose-100 text-rose-800')}">
+              ${item.action_type}
+            </span>
+          </td>
+          <td class="p-3.5">${item.staff_name}</td>
+          <td class="p-3.5 font-black text-slate-900">${parseFloat(item.total_amount).toFixed(2)}</td>
+          <td class="p-3.5 font-mono text-slate-400">${item.new_voucher_code ? '••••••••' + item.new_voucher_code.slice(-4) : '-'}</td>
+          <td class="p-3.5 text-center font-bold">${item.reprint_count}</td>
+          <td class="p-3.5 text-right">
+            <button type="button" onclick='reprintStaffRecord(${JSON.stringify(item)})' class="bg-slate-800 hover:bg-black text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition">Reprint</button>
+          </td>
+        </tr>
+      `).join('');
+
+      // อัปเดตตัวควบคุม Pagination
+      pag.classList.remove('hidden');
+      document.getElementById('history-page-info').innerText = `แสดงรายการ ${startIndex + 1} - ${Math.min(startIndex + itemsPerPage, totalItems)} จากทั้งหมด ${totalItems} รายการ`;
+      document.getElementById('history-page-num').innerText = `${currentHistoryPage} / ${totalPages}`;
+      document.getElementById('btn-prev-page').disabled = currentHistoryPage === 1;
+      document.getElementById('btn-next-page').disabled = currentHistoryPage === totalPages;
+    }
+
+    // เปลี่ยนหน้าประวัติ
+    function changeHistoryPage(step) {
+      currentHistoryPage += step;
+      renderHistoryPage();
     }
 
     // ฟังก์ชัน Reprint ประจำจุดพนักงาน
@@ -435,7 +495,7 @@
       }
     }
 
-    // สร้างสลิป 2 ท่อน (ลูกค้า / ร้าน)
+    // สร้างสลิป 2 ท่อน (แยกเป็นคนละหน้าเพื่อให้เครื่องพิมพ์ความร้อนสั่งตัดอัตโนมัติ)
     function renderAndPrintCombineSlip(data) {
       const p = document.getElementById('print-area');
       const formattedCode = data.newCode ? data.newCode.replace(/(\d{4})/g, '$1 ').trim() : '';
@@ -455,10 +515,10 @@
       `).join('');
 
       p.innerHTML = `
-        <div class="thermal-doc">
+        <!-- ท่อนที่ 1 สำหรับลูกค้า (ใส่ class page-break เพื่อให้คัตเตอร์เครื่องพิมพ์ตัดกระดาษ) -->
+        <div class="thermal-doc page-break">
           ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
           
-          <!-- ท่อนที่ 1 สำหรับลูกค้า -->
           <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:4px;">
             <div style="font-size:16px; font-weight:900;">ใบรับเงินรวมคูปอง</div>
             <div style="font-size:11px; font-weight:bold;">(เอกสารสำหรับลูกค้า)</div>
@@ -474,13 +534,12 @@
           <div style="border:2px solid #000; padding:6px; text-align:center; margin-top:8px; font-size:18px; font-weight:900;">
             ยอดรวมสุทธิ: ${data.totalAmount} บาท
           </div>
+        </div>
 
-          <!-- รอยตัดกระดาษ -->
-          <div style="text-align:center; margin:16px 0; font-size:11px; font-weight:bold; border-top:2px dashed #000; padding-top:4px;">
-            ✂️ - - - - - - ตัดหน้ากระดาษ - - - - - -
-          </div>
+        <!-- ท่อนที่ 2 ร้านเก็บไว้สแกน -->
+        <div class="thermal-doc">
+          ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
 
-          <!-- ท่อนที่ 2 ร้านเก็บไว้สแกน -->
           <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:4px;">
             <div style="font-size:16px; font-weight:900;">หลักฐานการรวมคูปอง</div>
             <div style="font-size:11px; font-weight:bold;">(ร้านเก็บไว้ / สแกนที่ตู้จ่ายเงิน)</div>
