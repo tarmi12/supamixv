@@ -7,11 +7,16 @@
   <script src="https://cdn.tailwindcss.com"></script>
   
   <style>
-    /* ตั้งค่ากระดาษความร้อน 80mm สำหรับ Chrome */
     @media screen {
       #print-area { display: none !important; }
     }
     @media print {
+      html, body {
+        width: 72mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+      }
       body * {
         visibility: hidden !important;
       }
@@ -23,27 +28,23 @@
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
-        width: 76mm !important;
+        width: 72mm !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 2mm !important;
         background-color: #ffffff !important;
         color: #000000 !important;
       }
       @page {
-        size: 80mm auto;
-        margin: 0;
-      }
-      /* คำสั่งตัดกระดาษผ่านการขึ้นหน้าใหม่ของ thermal printer */
-      .page-break {
-        page-break-after: always !important;
-        break-after: page !important;
+        size: auto;
+        margin: 0mm;
       }
     }
     .thermal-doc {
       font-family: 'Tahoma', 'Arial', sans-serif;
       color: #000000 !important;
       line-height: 1.35;
-      padding: 2mm;
+      width: 100%;
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -167,7 +168,7 @@
         </table>
       </div>
 
-      <!-- ส่วนควบคุมการเปลี่ยนหน้า Pagination -->
+      <!-- แถบควบคุม Pagination -->
       <div id="history-pagination" class="flex items-center justify-between border-t border-slate-200 pt-4 mt-4 hidden">
         <div class="text-sm text-slate-600 font-medium" id="history-page-info">
           กำลังแสดงรายการ...
@@ -193,7 +194,7 @@
     const EDGE_FUNCTION_URL = "https://vwsidnehgijyinuxqzqy.supabase.co/functions/v1/tiger-api";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3c2lkbmVoZ2lqeWludXhxenF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjI4MjcsImV4cCI6MjEwNTEzODgyN30.NiTeJBRKXAj3uy_32FtH--MupCyTNG2YpVypIsleyF8";
 
-    // สำหรับจัดการ Pagination
+    // จัดการ Pagination
     let historyAllData = [];
     let currentHistoryPage = 1;
     const itemsPerPage = 20;
@@ -254,7 +255,7 @@
       return await response.json();
     }
 
-    // ฟังก์ชันรวมยอดคูปองสำหรับพนักงาน
+    // ฟังก์ชันรวมยอดคูปองสำหรับพนักงาน (หน้า 1)
     async function processStaffCombine() {
       const staff = document.getElementById('staff_name').value.trim();
       const ref = document.getElementById('staff_combine_ref').value.trim();
@@ -318,6 +319,7 @@
           error_message: 'รวมยอดสำเร็จ'
         });
 
+        // สั่งพิมพ์แยก 2 ใบตัดตรงกลางอัตโนมัติ สำหรับหน้ารวมยอดคูปอง
         renderAndPrintCombineSlip({
           txId,
           dateStr: new Date().toLocaleString('th-TH'),
@@ -325,7 +327,8 @@
           ref: ref,
           oldVouchers: oldVoucherDetails,
           totalAmount: totalAmount.toFixed(2),
-          newCode: String(newCode)
+          newCode: String(newCode),
+          isReprint: false
         });
 
         document.getElementById('staff_combine_ref').value = '';
@@ -410,7 +413,7 @@
       }
     }
 
-    // ฟังก์ชันเรนเดอร์ข้อมูลแยกตามหน้าละ 20 รายการ
+    // เรนเดอร์แยกหน้าละ 20 รายการ
     function renderHistoryPage() {
       const tbody = document.getElementById('staff-history-rows');
       const pag = document.getElementById('history-pagination');
@@ -442,7 +445,6 @@
         </tr>
       `).join('');
 
-      // อัปเดตตัวควบคุม Pagination
       pag.classList.remove('hidden');
       document.getElementById('history-page-info').innerText = `แสดงรายการ ${startIndex + 1} - ${Math.min(startIndex + itemsPerPage, totalItems)} จากทั้งหมด ${totalItems} รายการ`;
       document.getElementById('history-page-num').innerText = `${currentHistoryPage} / ${totalPages}`;
@@ -495,13 +497,86 @@
       }
     }
 
-    // สร้างสลิป 2 ท่อน (แยกเป็นคนละหน้าเพื่อให้เครื่องพิมพ์ความร้อนสั่งตัดอัตโนมัติ)
+    // พิมพ์ผ่าน hidden iframe ทีละใบ เพื่อตัดกระดาษจริงและป้องกันเครื่องสับแหลก
+    function printHtmlViaFrame(htmlContent, callback) {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            @page { size: auto; margin: 0; }
+            html, body {
+              width: 72mm;
+              margin: 0;
+              padding: 0;
+              background: #fff;
+              font-family: 'Tahoma', 'Arial', sans-serif;
+              color: #000;
+            }
+            .thermal-doc {
+              width: 72mm;
+              box-sizing: border-box;
+              padding: 2mm;
+            }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `);
+      doc.close();
+
+      const runPrint = () => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          if (callback) callback();
+        }, 500);
+      };
+
+      const imgs = iframe.contentWindow.document.getElementsByTagName('img');
+      if (imgs.length > 0) {
+        let loaded = 0;
+        for (let i = 0; i < imgs.length; i++) {
+          if (imgs[i].complete) {
+            loaded++;
+          } else {
+            imgs[i].onload = () => {
+              loaded++;
+              if (loaded === imgs.length) runPrint();
+            };
+            imgs[i].onerror = () => {
+              loaded++;
+              if (loaded === imgs.length) runPrint();
+            };
+          }
+        }
+        if (loaded === imgs.length) runPrint();
+      } else {
+        setTimeout(runPrint, 250);
+      }
+    }
+
+    // ฟังก์ชันสร้างสลิปพิมพ์แยก 2 ใบตัดกระดาษอัตโนมัติ (ใช้ทั้งหน้ารวมยอด และหน้าประวัติ)
     function renderAndPrintCombineSlip(data) {
-      const p = document.getElementById('print-area');
       const formattedCode = data.newCode ? data.newCode.replace(/(\d{4})/g, '$1 ').trim() : '';
 
+      // ขยาย font ท่อนลูกค้า +12% เพื่อให้ผู้สูงอายุอ่านง่าย
       const oldList = data.oldVouchers.map((v, i) => `
-        <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold;">
+        <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:bold; margin-bottom:2px;">
           <span>ใบที่ ${i+1}:</span>
           <span>${parseFloat(v.amount).toFixed(2)} บาท</span>
         </div>
@@ -514,32 +589,32 @@
         </div>
       `).join('');
 
-      p.innerHTML = `
-        <!-- ท่อนที่ 1 สำหรับลูกค้า (ใส่ class page-break เพื่อให้คัตเตอร์เครื่องพิมพ์ตัดกระดาษ) -->
-        <div class="thermal-doc page-break">
-          ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
-          
-          <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:4px;">
-            <div style="font-size:16px; font-weight:900;">ใบรับเงินรวมคูปอง</div>
-            <div style="font-size:11px; font-weight:bold;">(เอกสารสำหรับลูกค้า)</div>
+      // ใบที่ 1: ท่อนลูกค้า (ขยายตัวหนังสือโต ชัดเจน)
+      const part1Html = `
+        <div class="thermal-doc">
+          ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px; font-size:13px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
+          <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:5px;">
+            <div style="font-size:18px; font-weight:900;">ใบรับเงินรวมคูปอง</div>
+            <div style="font-size:13px; font-weight:bold;">(เอกสารสำหรับลูกค้า)</div>
           </div>
-          <div style="font-size:12px; margin-top:6px; font-weight:bold;">
+          <div style="font-size:13.5px; margin-top:8px; font-weight:bold; line-height:1.4;">
             <div>วันที่-เวลา: ${data.dateStr}</div>
             <div>พนักงาน: ${data.staff} | บิล: ${data.ref}</div>
             <div>TX ID: ${data.txId}</div>
           </div>
-          <div style="border-top:1px dashed #000; margin-top:6px; padding-top:6px;">
+          <div style="border-top:1px dashed #000; margin-top:8px; padding-top:8px;">
             ${oldList}
           </div>
-          <div style="border:2px solid #000; padding:6px; text-align:center; margin-top:8px; font-size:18px; font-weight:900;">
+          <div style="border:2px solid #000; padding:8px; text-align:center; margin-top:10px; font-size:20px; font-weight:900;">
             ยอดรวมสุทธิ: ${data.totalAmount} บาท
           </div>
         </div>
+      `;
 
-        <!-- ท่อนที่ 2 ร้านเก็บไว้สแกน -->
+      // ใบที่ 2: ท่อนร้านค้า พร้อม QR Code สแกนตู้
+      const part2Html = `
         <div class="thermal-doc">
-          ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
-
+          ${data.isReprint ? `<div style="text-align:center; font-weight:bold; border:2px solid #000; padding:2px; margin-bottom:5px; font-size:12px;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
           <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:4px;">
             <div style="font-size:16px; font-weight:900;">หลักฐานการรวมคูปอง</div>
             <div style="font-size:11px; font-weight:bold;">(ร้านเก็บไว้ / สแกนที่ตู้จ่ายเงิน)</div>
@@ -555,17 +630,22 @@
               ${formattedCode}
             </div>
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data.newCode)}" 
-                 style="width:140px; height:140px; margin:auto; display:block;" 
-                 onload="window.print()" />
+                 style="width:140px; height:140px; margin:auto; display:block;" />
           </div>
         </div>
       `;
+
+      // ส่งพิมพ์ใบที่ 1 -> เครื่องตัดกระดาษ -> ส่งพิมพ์ใบที่ 2 -> เครื่องตัดกระดาษ
+      printHtmlViaFrame(part1Html, () => {
+        setTimeout(() => {
+          printHtmlViaFrame(part2Html);
+        }, 400);
+      });
     }
 
     // สร้างสลิป VOID
     function renderAndPrintVoidSlip(data) {
-      const p = document.getElementById('print-area');
-      p.innerHTML = `
+      const voidHtml = `
         <div class="thermal-doc" style="text-align:center;">
           ${data.isReprint ? `<div style="border:2px solid #000; padding:2px; margin-bottom:5px; font-weight:bold;">*** REPRINT SLIP (${data.reprintBy}) ***</div>` : ''}
           <div style="font-size:18px; font-weight:900; border:2px solid #000; padding:4px;">*** สลิปยกเลิกคูปอง (VOID) ***</div>
@@ -581,7 +661,7 @@
           </div>
         </div>
       `;
-      setTimeout(() => { window.print(); }, 200);
+      printHtmlViaFrame(voidHtml);
     }
   </script>
 </body>
